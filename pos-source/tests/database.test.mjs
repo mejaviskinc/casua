@@ -38,6 +38,7 @@ await assert.rejects(()=>db.query("update products set discount_type='percent',d
 await as(null);
 const fixedPayload={...promoPayload,source:'qr',table_id:tid,discount:999999,request_id:'99999999-9999-4999-8999-999999999999',tracking_token:'99999999-aaaa-4aaa-8aaa-999999999999'};
 const fixedOrder=await scalar('select submit_order($1::jsonb)',[JSON.stringify(fixedPayload)]);
+await as(owner); // Anonymous customers can create/track an order, but cannot read the private orders table.
 const fixedDetails=(await db.query('select items,total,discount from orders where id=$1',[fixedOrder.id])).rows[0];
 assert.equal(Number(fixedDetails.total),41000);assert.equal(Number(fixedDetails.discount),0);
 assert.equal(fixedDetails.items[0].menu_discount,3500);assert.equal(fixedDetails.items[0].unit_price,20500);
