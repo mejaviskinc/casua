@@ -11,6 +11,7 @@ function flat(orders){return normalize(orders).flatMap(po=>(po.items||[]).map((i
 export async function exportPurchasingPDF(orders,print=false){
  const data=normalize(orders);
  if(!data.length)throw new Error('Belum ada data purchasing yang bisa diekspor.');
+ const printWindow=print?window.open('','_blank'):null;
  const {jsPDF}=await import('jspdf');
  const {default:autoTable}=await import('jspdf-autotable');
  const pdf=new jsPDF({unit:'mm',format:'a4'});
@@ -35,7 +36,7 @@ export async function exportPurchasingPDF(orders,print=false){
   pdf.setFont('helvetica','bold');pdf.setTextColor(20,45,82);pdf.text('Total estimasi: '+money(po.total),196,y,{align:'right'});y+=14;
  }
  const filename='CAUSA-Purchasing-'+(data.length===1?poNo(data[0]):new Date().toISOString().slice(0,10))+'.pdf';
- if(print){pdf.autoPrint();const url=pdf.output('bloburl');const popup=window.open(url,'_blank');if(!popup)pdf.save(filename);}
+ if(print){pdf.autoPrint();const url=pdf.output('bloburl');if(printWindow)printWindow.location.href=url;else pdf.save(filename);}
  else pdf.save(filename);
 }
 export async function exportPurchasingExcel(orders){
