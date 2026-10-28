@@ -23,7 +23,7 @@
     "@vitejs/plugin-react": "5.2.0",
     "vite": "7.3.6",
     "tailwindcss": "4.1.18",
-    "@tailwindcss/vite": "4.1.18",
+    "@tailwindcss/vite": "4.3.3",
     "@electric-sql/pglite": "0.3.14"
   }
 }
