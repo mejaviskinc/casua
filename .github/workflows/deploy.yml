@@ -19,16 +19,50 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Verify site files and custom domain
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: |
+            source/package-lock.json
+            pos-source/package-lock.json
+      - name: Build website including admin CAPTCHA
         run: |
-          test -s index.html
-          test "$(cat CNAME)" = "causacaffe.com"
+          npm ci --prefix source
+          npm run build --prefix source
+      - name: Build POS including login CAPTCHA
+        run: |
+          npm ci --prefix pos-source
+          npm test --prefix pos-source
+          npm run build --prefix pos-source
+      - name: Assemble GitHub Pages artifact
+        run: |
+          mkdir -p "$RUNNER_TEMP/causa-pages"
+          cp -a . "$RUNNER_TEMP/causa-pages/"
+          rm -rf "$RUNNER_TEMP/causa-pages/.git" "$RUNNER_TEMP/causa-pages/.github" "$RUNNER_TEMP/causa-pages/source" "$RUNNER_TEMP/causa-pages/pos-source"
+          cp -a source/dist/. "$RUNNER_TEMP/causa-pages/"
+          mkdir -p "$RUNNER_TEMP/causa-pages/pos" "$RUNNER_TEMP/causa-pages/dashboard" "$RUNNER_TEMP/causa-pages/admin"
+          cp -a pos-source/dist/. "$RUNNER_TEMP/causa-pages/pos/"
+          cp source/dist/index.html "$RUNNER_TEMP/causa-pages/dashboard/index.html"
+          cp source/dist/index.html "$RUNNER_TEMP/causa-pages/admin/index.html"
+          cp source/dist/index.html "$RUNNER_TEMP/causa-pages/404.html"
+          python3 - <<'PY'
+          from pathlib import Path
+          root=Path(__import__('os').environ['RUNNER_TEMP'])/'causa-pages'
+          for name in ('dashboard/index.html','admin/index.html'):
+              p=root/name
+              p.write_text(p.read_text().replace('</head>','<meta name="robots" content="noindex,nofollow"/></head>'))
+          assert (root/'index.html').exists()
+          assert (root/'pos/index.html').exists()
+          assert (root/'CNAME').read_text().strip() == 'causacaffe.com'
+          PY
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static website
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: ${{ runner.temp }}/causa-pages
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
