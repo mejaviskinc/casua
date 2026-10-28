@@ -24,7 +24,7 @@ const showError=e=>{$('status').textContent=e?.message||String(e)};
 async function list(table,limit=200){const {data,error}=await db.from(table).select('*').order(table==='settings'?'id':'created_at',{ascending:false}).limit(limit);if(error)throw error;return data||[]}
 async function session(){
 const {data:{user:u}}=await db.auth.getUser();user=u;
-if(recovering){showAuthForm('reset');return}if(!u){$('login').style.display='block';$('screen').style.display='none';return}
+if(recovering){showAuthForm('reset');$('newPasswordMessage').textContent=u?'Masukkan password baru Anda.':'Memeriksa tautan pemulihan... Jika tidak berubah, mintalah tautan reset baru.';return}if(!u){$('login').style.display='block';$('screen').style.display='none';return}
 const {data:s,error}=await db.from('staff').select('name,role,active').eq('id',u.id).maybeSingle();
 if(error||!s?.active){await db.auth.signOut();$('message').textContent='Akun belum terdaftar sebagai staf aktif. Hubungi Owner.';$('login').style.display='block';$('screen').style.display='none';return}
 role=s.role;$('userInfo').textContent=s.name+' · '+role;$('login').style.display='none';$('screen').style.display='flex';render()}
@@ -39,12 +39,12 @@ msg.style.color='#157348';msg.textContent='Pendaftaran diterima. Periksa email u
 if(data.session){await db.auth.signOut()}
 }catch(error){msg.textContent=error.message||'Pendaftaran gagal.'}finally{submit.disabled=false}
 });
-let recovering=location.hash.includes('type=recovery')||new URLSearchParams(location.search).get('type')==='recovery';
+let recovering=location.hash.includes('type=recovery')||new URLSearchParams(location.search).get('type')==='recovery'||new URLSearchParams(location.search).get('reset')==='1';
 function showAuthForm(mode){$('login').style.display='block';$('screen').style.display='none';$('loginForm').style.display=mode==='login'?'grid':'none';$('registerForm').style.display='none';$('openRegister').parentElement.style.display=mode==='login'?'block':'none';$('forgotForm').style.display=mode==='forgot'?'grid':'none';$('newPasswordForm').style.display=mode==='reset'?'grid':'none';}
 $('forgotBtn').onclick=()=>{$('forgotEmail').value=$('email').value;showAuthForm('forgot')};
 $('forgotBack').onclick=()=>showAuthForm('login');
-$('forgotForm').addEventListener('submit',async e=>{e.preventDefault();const msg=$('forgotMessage');const b=e.target.querySelector('button[type=submit]');b.disabled=true;msg.textContent='Mengirim...';try{const {error}=await db.auth.resetPasswordForEmail($('forgotEmail').value.trim(),{redirectTo:location.origin+location.pathname});if(error)throw error;msg.textContent='Jika email terdaftar, link reset akan dikirim. Periksa inbox dan folder spam.'}catch(err){msg.textContent=err.message||'Gagal mengirim link reset.'}finally{b.disabled=false}});
-$('newPasswordForm').addEventListener('submit',async e=>{e.preventDefault();const msg=$('newPasswordMessage');if($('newPassword').value!==$('confirmNewPassword').value){msg.textContent='Konfirmasi password tidak cocok.';return}const b=e.target.querySelector('button[type=submit]');b.disabled=true;msg.textContent='Menyimpan...';try{const {error}=await db.auth.updateUser({password:$('newPassword').value});if(error)throw error;recovering=false;await db.auth.signOut();history.replaceState(null,'',location.pathname);showAuthForm('login');$('message').textContent='Password diperbarui. Silakan masuk kembali.'}catch(err){msg.textContent=err.message||'Gagal memperbarui password.'}finally{b.disabled=false}});
+$('forgotForm').addEventListener('submit',async e=>{e.preventDefault();const msg=$('forgotMessage');const b=e.target.querySelector('button[type=submit]');b.disabled=true;msg.textContent='Mengirim...';try{const {error}=await db.auth.resetPasswordForEmail($('forgotEmail').value.trim(),{redirectTo:location.origin+location.pathname+'?reset=1'});if(error)throw error;msg.textContent='Jika email terdaftar, link reset akan dikirim. Periksa inbox dan folder spam.'}catch(err){msg.textContent=err.message||'Gagal mengirim link reset.'}finally{b.disabled=false}});
+$('newPasswordForm').addEventListener('submit',async e=>{e.preventDefault();const msg=$('newPasswordMessage');if($('newPassword').value!==$('confirmNewPassword').value){msg.textContent='Konfirmasi password tidak cocok.';return}const b=e.target.querySelector('button[type=submit]');b.disabled=true;msg.textContent='Menyimpan...';try{const {data:{user:verifiedUser},error:verifyError}=await db.auth.getUser();if(verifyError||!verifiedUser)throw new Error('Tautan reset belum valid atau sudah kedaluwarsa. Kembali ke login dan kirim ulang link reset.');const {error}=await db.auth.updateUser({password:$('newPassword').value});if(error)throw error;recovering=false;await db.auth.signOut();history.replaceState(null,'',location.pathname);showAuthForm('login');$('message').textContent='Password diperbarui. Silakan masuk kembali.'}catch(err){msg.textContent=err.message||'Gagal memperbarui password.'}finally{b.disabled=false}});
 $('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('message').textContent='Memproses...';const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){$('message').textContent=error.message;return}$('message').textContent='';await session()});
 $('logout').onclick=async()=>{await db.auth.signOut();session()};
 $('refresh').onclick=()=>render();
@@ -75,5 +75,5 @@ if(role!=='owner'){$('content').innerHTML='<div class="panel">Hanya Owner yang d
 $('status').textContent='Data tersinkron dengan Supabase.';
 }catch(e){showError(e)}
 }
-db.auth.onAuthStateChange((event)=>{if(event==='PASSWORD_RECOVERY'){recovering=true;showAuthForm('reset')}else if(event==='SIGNED_OUT'&&!recovering){showAuthForm('login')}});session();
+db.auth.onAuthStateChange((event)=>{if(event==='PASSWORD_RECOVERY'){recovering=true;showAuthForm('reset');$('newPasswordMessage').textContent='Link diverifikasi. Silakan buat password baru.'}else if(event==='SIGNED_IN'&&recovering){showAuthForm('reset');$('newPasswordMessage').textContent='Silakan buat password baru.'}else if(event==='SIGNED_OUT'&&!recovering){showAuthForm('login')}});session();
 </script></body></html>
