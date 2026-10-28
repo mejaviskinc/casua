@@ -55,3 +55,21 @@
  .cart-form{padding:0 11px 14px}
 }
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
+
+
+/* Editable per-item discounts, reflected consistently in menu cards, POS and QR */
+.old-price{display:block;color:#98a5b8;font-weight:450;text-decoration:line-through;font-size:11px}
+.product-price{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.discount-tag{display:inline-flex;align-items:center;width:max-content;max-width:100%;padding:4px 8px;border-radius:6px;color:#1a755d;background:#eaf8f1;font-size:10px;font-weight:700;margin-top:5px}
+.table-price{display:flex;flex-direction:column;align-items:flex-start;gap:2px}
+.cart-menu-discount,.promo-detail{color:#1c8367!important;font-weight:650}
+.discount-config{padding:16px;margin:16px 0;background:#f6f9fd;border:1px solid #dce8f6;border-radius:12px}
+.discount-config .form-section-title{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+.discount-config .form-section-title span{color:#74859a;font-size:10px;font-weight:500}
+.discount-config .discount-preview{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:13px 0}
+.discount-preview span{display:flex;flex-direction:column;gap:5px;padding:10px 12px;border:1px solid #e3ebf5;background:white;border-radius:9px;color:#75849a;font-size:10px}
+.discount-preview strong{font-size:13px;color:#203f66}
+.discount-preview span:last-child{border-color:#b7d6c6;background:#f0faf4}
+.discount-preview span:last-child strong{color:#0d7951}
+.discount-config>small{display:block;color:#718198;font-size:10px;line-height:1.7}
+@media(max-width:520px){.discount-config .discount-preview{grid-template-columns:1fr}.discount-preview span{flex-direction:row;justify-content:space-between;align-items:center}}
