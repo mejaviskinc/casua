@@ -19,8 +19,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Verify site files
-        run: test -s index.html
+      - name: Verify site files and custom domain
+        run: |
+          test -s index.html
+          test "$(cat CNAME)" = "causacaffe.com"
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload static website
