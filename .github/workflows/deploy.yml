@@ -37,6 +37,11 @@ jobs:
           npm ci --prefix pos-source
           npm test --prefix pos-source
           npm run build --prefix pos-source
+      - name: Verify POS CAPTCHA is present in production build
+        run: |
+          grep -q 'challenges.cloudflare.com/turnstile' pos-source/dist/index.html
+          grep -R -q '0x4AAAAAAFpOoLtbZ84hNrxj' pos-source/dist/assets
+          echo "POS Turnstile loader and site key found in the compiled assets"
       - name: Assemble GitHub Pages artifact
         run: |
           mkdir -p "$RUNNER_TEMP/causa-pages"
