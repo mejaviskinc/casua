@@ -2,3 +2,6 @@ source/node_modules/
 source/dist/
 .env
 .env.*
+
+pos-source/node_modules
+pos-source/dist/

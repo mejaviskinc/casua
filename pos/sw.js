@@ -1,0 +1,5 @@
+const CACHE='causa-pos-v1';
+const SHELL_ASSETS=['/pos/','/pos/causa-logo.jpeg','/pos/icons/icon-192.png','/pos/icons/icon-512.png'];
+self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL_ASSETS))) });
+self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k.startsWith('causa-pos-')&&k!==CACHE).map(k=>caches.delete(k)))).then(()=>self.clients.claim()))});
+self.addEventListener('fetch',e=>{const u=new URL(e.request.url);if(e.request.method!=='GET'||u.origin!==self.location.origin||u.pathname.startsWith('/api/')||u.pathname.includes('schema.sql')||u.pathname.includes('PANDUAN'))return;if(e.request.mode==='navigate'){e.respondWith(fetch(e.request).catch(()=>caches.match('/pos/')));return}if(u.pathname.startsWith('/pos/assets/')||u.pathname.startsWith('/pos/icons/')||u.pathname==='/pos/causa-logo.jpeg'){e.respondWith(caches.match(e.request).then(cached=>cached||fetch(e.request).then(res=>{if(res.ok){const clone=res.clone();caches.open(CACHE).then(c=>c.put(e.request,clone))}return res})))}});
