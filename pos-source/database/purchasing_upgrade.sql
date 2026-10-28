@@ -66,7 +66,7 @@ begin
  values(supplier,left(coalesce(payload->>'note',''),500),expected,snapshot,subtotal,auth.uid())
  returning * into new_order;
  return to_jsonb(new_order);
-end;$function$
+end;$function$;
 
 CREATE OR REPLACE FUNCTION public.create_purchase(payload jsonb)
  RETURNS jsonb
@@ -74,7 +74,7 @@ CREATE OR REPLACE FUNCTION public.create_purchase(payload jsonb)
  SET search_path TO ''
 AS $function$
  select causa_private.create_purchase(payload)
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION causa_private.progress_purchase(purchase_id uuid, operation text)
  RETURNS jsonb
@@ -110,7 +110,7 @@ begin
    raise exception 'Aksi pembelian tidak valid';
  end if;
  return to_jsonb(po);
-end;$function$
+end;$function$;
 
 CREATE OR REPLACE FUNCTION public.progress_purchase(purchase_id uuid, operation text)
  RETURNS jsonb
@@ -118,7 +118,7 @@ CREATE OR REPLACE FUNCTION public.progress_purchase(purchase_id uuid, operation 
  SET search_path TO ''
 AS $function$
  select causa_private.progress_purchase(purchase_id,operation)
-$function$
+$function$;
 
 revoke execute on function causa_private.create_purchase(jsonb),causa_private.progress_purchase(uuid,text) from public,anon,authenticated;
 grant execute on function causa_private.create_purchase(jsonb),causa_private.progress_purchase(uuid,text) to authenticated;
