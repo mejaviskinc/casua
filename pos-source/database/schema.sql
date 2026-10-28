@@ -20,7 +20,15 @@ grant execute on function causa_private.current_role() to authenticated,anon;
 create table public.products (
  id uuid primary key default gen_random_uuid(), name text not null check(length(name) between 1 and 120),
  category text not null check(category in ('Coffee','Non-Coffee','Food','Snack')),
- price bigint not null check(price>=0 and price<=10000000), description text not null default '',
+ price bigint not null check(price>=0 and price<=10000000),
+ discount_type text not null default 'none',
+ discount_value bigint not null default 0,
+ constraint products_discount_valid check(
+   (discount_type='none' and discount_value=0)
+   or (discount_type='percent' and discount_value between 1 and 100)
+   or (discount_type='amount' and discount_value between 1 and price)
+ ),
+ description text not null default '',
  image_url text, available boolean not null default true, archived boolean not null default false,
  sizes jsonb not null default '[]' check(jsonb_typeof(sizes)='array'),
  toppings jsonb not null default '[]' check(jsonb_typeof(toppings)='array'), created_at timestamptz not null default now()
@@ -110,7 +118,7 @@ grant update on public.settings to authenticated;
 -- Public API functions below are SECURITY INVOKER wrappers, granted individually.
 create function causa_private.submit_order(payload jsonb) returns jsonb language plpgsql security definer set search_path='' as $$
 declare r text:=causa_private.current_role(); existing public.orders; p public.products; line jsonb; sz jsonb; tp jsonb;
- snapshot jsonb:='[]'; sub bigint:=0; amount bigint; qty int; dis bigint; rid uuid; track uuid; tid uuid; label text:=''; src text; kind text; oid uuid;
+ snapshot jsonb:='[]'; sub bigint:=0; amount bigint; original_amount bigint; base_discount bigint; qty int; dis bigint; rid uuid; track uuid; tid uuid; label text:=''; src text; kind text; oid uuid;
 begin
  rid:=(payload->>'request_id')::uuid; track:=(payload->>'tracking_token')::uuid;
  if track is null or rid is null then raise exception 'Identitas pesanan tidak valid'; end if;
@@ -146,9 +154,11 @@ begin
      select value into tp from jsonb_array_elements(p.toppings) where value->>'name'=line->>'topping';
      if tp is null then raise exception 'Topping tidak tersedia';end if;
    end if;
-   amount:=p.price+coalesce((sz->>'extra')::bigint,0)+coalesce((tp->>'extra')::bigint,0);
-   if amount<0 then raise exception 'Harga tidak valid';end if;
-   snapshot:=snapshot||jsonb_build_array(jsonb_build_object('product_id',p.id,'name',p.name,'quantity',qty,'size',coalesce(line->>'size',''),'topping',coalesce(line->>'topping',''),'unit_price',amount,'stock_multiplier',greatest(coalesce((sz->>'stock_multiplier')::numeric,1),0.001)));
+   original_amount:=p.price+coalesce((sz->>'extra')::bigint,0)+coalesce((tp->>'extra')::bigint,0);
+   base_discount:=case when p.discount_type='percent' then round(p.price::numeric*p.discount_value/100)::bigint when p.discount_type='amount' then p.discount_value else 0 end;
+   amount:=original_amount-base_discount;
+   if amount<0 then raise exception 'Harga diskon tidak valid';end if;
+   snapshot:=snapshot||jsonb_build_array(jsonb_build_object('product_id',p.id,'name',p.name,'quantity',qty,'size',coalesce(line->>'size',''),'topping',coalesce(line->>'topping',''),'unit_price',amount,'original_unit_price',original_amount,'menu_discount',base_discount,'stock_multiplier',greatest(coalesce((sz->>'stock_multiplier')::numeric,1),0.001)));
    sub:=sub+amount*qty;
  end loop;
  dis:=case when src='pos' then coalesce((payload->>'discount')::bigint,0) else 0 end;
