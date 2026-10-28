@@ -1,7 +1,7 @@
 export const money = n => new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(n)||0);
 export const dayKey = d => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jakarta',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(d));
 export const todayKey = () => dayKey(new Date());
-export const categories = ['Coffee','Non-Coffee','Food','Snack'];
+export const categories = ['Coffee','Non-Coffee','Coffee Beans','Food','Snack'];
 export const stages = ['new','preparing','ready','completed'];
 export const stageNames = {pending:'Menunggu konfirmasi',new:'Pesanan Baru',preparing:'Sedang Dibuat',ready:'Siap Diambil',completed:'Selesai',cancelled:'Dibatalkan'};
 export function totals(items,discount=0){const subtotal=items.reduce((s,i)=>s+(Number(i.unit_price)||0)*i.quantity,0); const cut=Math.min(subtotal,Math.max(0,Number(discount)||0));return {subtotal,discount:cut,total:subtotal-cut};}
