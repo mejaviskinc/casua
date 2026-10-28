@@ -22,5 +22,25 @@ await as(barista);await db.query("select advance_order($1,'preparing')",[order.i
 await as(owner);await db.query("select cancel_order($1,'Test refund')",[order.id]);await db.query("select cancel_order($1,'Retry refund')",[order.id]);assert.equal(Number(await scalar('select stock from ingredients where id=$1',[iid])),100);assert.equal(await scalar("select count(*)::int from orders where payment_status='paid' and status<>'cancelled'"),0);console.log('PASS owner cancellation restores stock once and removes revenue');
 await as(cashier);const large={...payload,request_id:'66666666-6666-4666-8666-666666666666',items:[{...payload.items[0],quantity:99}]};const largeOrder=await scalar('select submit_order($1::jsonb)',[JSON.stringify(large)]);await assert.rejects(()=>db.query("select pay_order($1,'cash',9999999,false)",[largeOrder.id]),/Stok/);assert.equal(await scalar('select payment_status from orders where id=$1',[largeOrder.id]),'unpaid');assert.equal(Number(await scalar('select stock from ingredients where id=$1',[iid])),100);console.log('PASS insufficient stock rolls back entire payment');
 await as(null);assert.equal(await scalar('select count(*)::int from products'),1);await assert.rejects(()=>db.query('select * from orders'),/permission denied/);await assert.rejects(()=>db.query('select * from staff'),/permission denied/);const qr={...payload,source:'qr',table_id:tid,discount:999999,request_id:'77777777-7777-4777-8777-777777777777'};const qo=await scalar('select submit_order($1::jsonb)',[JSON.stringify(qr)]);const tracked=await scalar('select track_order($1,$2)',[qo.id,payload.tracking_token]);assert.equal(tracked.total,50000);assert.equal(tracked.status,'pending');const denied=await scalar('select track_order($1,$2)',[qo.id,'99999999-9999-4999-8999-999999999999']);assert.equal(denied,null);console.log('PASS anonymous QR is pending, price-safe, and token-protected');
+// Menu discounts must be calculated server-side and stored as immutable order snapshots.
+await as(owner);
+const promoPid=await scalar("insert into products(name,category,price,discount_type,discount_value,sizes,toppings) values('Promo Latte','Coffee',20000,'percent',10,'[{\"name\":\"Large\",\"extra\":3000}]','[{\"name\":\"Syrup\",\"extra\":1000}]') returning id");
+await as(cashier);
+const promoPayload={...payload,request_id:'88888888-8888-4888-8888-888888888888',tracking_token:'88888888-aaaa-4aaa-8aaa-888888888888',discount:2000,items:[{product_id:promoPid,quantity:2,size:'Large',topping:'Syrup',unit_price:1}]};
+const promoOrder=await scalar('select submit_order($1::jsonb)',[JSON.stringify(promoPayload)]);
+const promoDetails=(await db.query('select items,subtotal,discount,total from orders where id=$1',[promoOrder.id])).rows[0];
+assert.equal(Number(promoDetails.subtotal),44000);assert.equal(Number(promoDetails.discount),2000);assert.equal(Number(promoDetails.total),42000);
+assert.equal(promoDetails.items[0].original_unit_price,24000);assert.equal(promoDetails.items[0].menu_discount,2000);assert.equal(promoDetails.items[0].unit_price,22000);
+console.log('PASS percentage discount + size/topping extras + separate cashier discount');
+await as(owner);
+await db.query("update products set discount_type='amount',discount_value=3500 where id=$1",[promoPid]);
+await assert.rejects(()=>db.query("update products set discount_type='percent',discount_value=101 where id=$1",[promoPid]),/check constraint/i);
+await as(null);
+const fixedPayload={...promoPayload,source:'qr',table_id:tid,discount:999999,request_id:'99999999-9999-4999-8999-999999999999',tracking_token:'99999999-aaaa-4aaa-8aaa-999999999999'};
+const fixedOrder=await scalar('select submit_order($1::jsonb)',[JSON.stringify(fixedPayload)]);
+const fixedDetails=(await db.query('select items,total,discount from orders where id=$1',[fixedOrder.id])).rows[0];
+assert.equal(Number(fixedDetails.total),41000);assert.equal(Number(fixedDetails.discount),0);
+assert.equal(fixedDetails.items[0].menu_discount,3500);assert.equal(fixedDetails.items[0].unit_price,20500);
+console.log('PASS fixed discount + anonymous QR price authority + DB discount constraints');
 await as(cashier);await db.query('insert into attendance(staff_id) values($1)',[cashier]);await db.query('select clock_out()');await assert.rejects(()=>db.query('select clock_out()'),/Belum/);console.log('PASS attendance clocks out only once');
 await db.close();console.log('ALL DATABASE CHECKS PASSED (isolated local PostgreSQL; not live Supabase)');
