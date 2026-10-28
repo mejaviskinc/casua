@@ -1,4 +1,6 @@
 User-agent: *
 Allow: /
 Disallow: /admin
+Disallow: /dashboard
+Disallow: /pos
 Sitemap: https://causacaffe.com/sitemap.xml
