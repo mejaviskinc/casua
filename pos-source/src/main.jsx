@@ -8,6 +8,16 @@ import {download,exportExcel,exportPDF,receiptPDF} from './exports';
 import QRCode from 'qrcode';
 import './style.css';
 
+// Keep customer-facing URLs free from referral tracking injected by link-sharing apps.
+// Preserve legitimate POS parameters (menu, table, activate, auth, etc.).
+function removeChatGPTTrackingParameter(){
+  const current=new URL(window.location.href);
+  if(current.searchParams.get('utm_source')?.toLowerCase()!=='chatgpt.com')return;
+  current.searchParams.delete('utm_source');
+  window.history.replaceState(window.history.state,'',current.pathname+current.search+current.hash);
+}
+removeChatGPTTrackingParameter();
+
 const CAUSA_TURNSTILE_SITE_KEY='0x4AAAAAAFpOoLtbZ84hNrxj';
 function CausaCaptcha({onToken}){
  const ref=React.useRef(null);
