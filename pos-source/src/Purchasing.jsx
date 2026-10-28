@@ -24,7 +24,7 @@ function PurchaseDialog({data,initial,close,run,load,busy}){
   e.preventDefault();
   run(async()=>{
    if(lines.length===0)throw Error('Tambahkan minimal satu bahan belanja.');
-   if(lines.some(l=>!l.ingredient_id||!Number.isFinite(Number(l.quantity))||Number(l.quantity)<=0||Number(l.quantity)>10000000||Math.round(Number(l.quantity)*1000)!==Number(l.quantity)*1000||!Number.isInteger(Number(l.estimated_cost))||Number(l.estimated_cost)<0))throw Error('Periksa jumlah bahan dan estimasi biaya.');
+   if(lines.some(l=>!l.ingredient_id||!Number.isFinite(Number(l.quantity))||Number(l.quantity)<=0||Number(l.quantity)>10000000||Math.abs(Math.round(Number(l.quantity)*1000)-Number(l.quantity)*1000)>0.000001||!Number.isInteger(Number(l.estimated_cost))||Number(l.estimated_cost)<0))throw Error('Periksa jumlah bahan dan estimasi biaya.');
    await rpc('create_purchase',{payload:{supplier_name:supplier.trim(),note,expected_date:expected||null,items:lines.map(l=>({ingredient_id:l.ingredient_id,quantity:Number(l.quantity),estimated_cost:Number(l.estimated_cost)}))}});
    await load();
    close();
