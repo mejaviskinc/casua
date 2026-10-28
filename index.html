@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="id"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>CAUSA CAFE — Management</title><meta name="theme-color" content="#084DA8">
+<style>
+:root{font-family:Inter,system-ui,-apple-system,sans-serif;color:#163052;background:#f5f7fa}*{box-sizing:border-box}
+body{margin:0}button,input,select{font:inherit}button{cursor:pointer} .app{display:flex;min-height:100vh}
+aside{width:236px;background:#084DA8;color:white;padding:28px 18px;flex-shrink:0}.brand{font-size:22px;font-weight:800;letter-spacing:1px;margin-bottom:34px}
+nav button{display:block;color:white;background:transparent;border:0;border-radius:10px;padding:13px 15px;width:100%;text-align:left;margin:7px 0}nav button.active,nav button:hover{background:#ffffff25}
+main{flex:1;min-width:0;padding:30px;max-width:1200px;margin:auto}.head{display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:22px}h1{font-size:26px;margin:0 0 4px}h2{font-size:18px;margin:0 0 15px}small,.muted{color:#6f7d92}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.panel,.metric{background:white;border:1px solid #e5eaf1;border-radius:15px;padding:20px;box-shadow:0 5px 20px #001c4010}.metric b{display:block;font-size:26px;margin-top:12px;color:#084DA8}.panel{margin-top:18px;overflow:auto}table{width:100%;border-collapse:collapse;text-align:left;white-space:nowrap}td,th{padding:12px;border-bottom:1px solid #edf0f4}th{font-size:13px;color:#68758b}.primary{background:#084DA8;color:white;border:0;border-radius:9px;padding:11px 16px}.ghost{background:#fff;border:1px solid #dce4ef;border-radius:9px;padding:10px 14px}.pill{background:#e7f1ff;color:#084DA8;padding:5px 9px;border-radius:12px;font-size:12px}.form{display:grid;gap:12px}.form input,.form select{padding:13px;border:1px solid #d8e0ec;border-radius:9px;width:100%}.login{max-width:410px;margin:10vh auto;padding:30px;background:#fff;border-radius:20px;border:1px solid #e1e8f0}.login .brand{color:#084DA8;margin-bottom:16px}#message{color:#ad2732;font-size:14px}#status{color:#61728a;font-size:13px}#screen{display:none}.notice{background:#eff5fe;border-left:3px solid #084DA8;padding:12px;border-radius:8px;margin-top:15px}.actions{display:flex;gap:8px;flex-wrap:wrap}select{padding:8px;border:1px solid #d8e0ec;border-radius:7px}
+@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}aside{width:175px}main{padding:20px}}@media(max-width:600px){.app{display:block}aside{width:100%;padding:15px}.brand{margin-bottom:10px}nav{display:flex;overflow:auto;gap:5px}nav button{min-width:max-content;margin:0}main{padding:15px}.grid{grid-template-columns:1fr 1fr}.metric{padding:13px}.metric b{font-size:19px}}
+</style></head><body>
+<div id="login" class="login"><div class="brand">CAUSA CAFE</div><h1>Masuk ke Dashboard</h1><p class="muted">Sistem manajemen coffee shop</p><form id="loginForm" class="form"><input id="email" type="email" placeholder="Email" required autocomplete="username"><input id="password" type="password" placeholder="Password" required autocomplete="current-password"><button class="primary">Masuk</button><p id="message" role="alert"></p></form></div>
+<div id="screen" class="app"><aside><div class="brand">CAUSA CAFE</div><nav id="nav"><button class="active" data-view="dashboard">Dashboard</button><button data-view="products">Menu Produk</button><button data-view="orders">Pesanan</button><button data-view="inventory">Inventori</button><button data-view="expenses">Pengeluaran</button></nav></aside><main><div class="head"><div><h1 id="title">Dashboard</h1><small id="userInfo"></small></div><div class="actions"><button class="ghost" id="refresh">↻ Muat ulang</button><button class="ghost" id="logout">Keluar</button></div></div><p id="status"></p><div id="content"></div></main></div>
+<script type="module">
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.57.0';
+const url='https://nbkszvcaaitualyonkcw.supabase.co';
+const key='sb_publishable_z9WM8n1SpxCRYe_pcbTr9g_rnRG1xQm';
+const db=createClient(url,key);let current='dashboard';let role=null;let user=null;
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const rupiah=n=>new Intl.NumberFormat('id-ID',{style:'currency',currency:'IDR',maximumFractionDigits:0}).format(Number(n)||0);
+const date=s=>s?new Date(s).toLocaleString('id-ID',{timeZone:'Asia/Jakarta'}):'-';
+const showError=e=>{$('status').textContent=e?.message||String(e)};
+async function list(table,limit=200){const {data,error}=await db.from(table).select('*').order(table==='settings'?'id':'created_at',{ascending:false}).limit(limit);if(error)throw error;return data||[]}
+async function session(){
+const {data:{user:u}}=await db.auth.getUser();user=u;
+if(!u){$('login').style.display='block';$('screen').style.display='none';return}
+const {data:s,error}=await db.from('staff').select('name,role,active').eq('id',u.id).maybeSingle();
+if(error||!s?.active){await db.auth.signOut();$('message').textContent='Akun belum terdaftar sebagai staf aktif. Hubungi Owner.';$('login').style.display='block';$('screen').style.display='none';return}
+role=s.role;$('userInfo').textContent=s.name+' · '+role;$('login').style.display='none';$('screen').style.display='flex';render()}
+$('loginForm').addEventListener('submit',async e=>{e.preventDefault();$('message').textContent='Memproses...';const {error}=await db.auth.signInWithPassword({email:$('email').value.trim(),password:$('password').value});if(error){$('message').textContent=error.message;return}$('message').textContent='';await session()});
+$('logout').onclick=async()=>{await db.auth.signOut();session()};
+$('refresh').onclick=()=>render();
+$('nav').addEventListener('click',e=>{const b=e.target.closest('button[data-view]');if(!b)return;current=b.dataset.view;document.querySelectorAll('#nav button').forEach(el=>el.classList.toggle('active',el===b));render()});
+function table(headers,rows){return '<div class="panel"><table><thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+ (rows.length?rows.join(''):'<tr><td colspan="'+headers.length+'">Belum ada data</td></tr>')+'</tbody></table></div>'}
+async function render(){
+$('status').textContent='Memuat data...';$('title').textContent=({dashboard:'Dashboard',products:'Menu Produk',orders:'Pesanan',inventory:'Inventori',expenses:'Pengeluaran'})[current];$('content').innerHTML='';
+try{
+if(current==='dashboard'){
+const [orders,products,ingredients,expenses]=await Promise.all([list('orders'),list('products'),list('ingredients'),role==='owner'?list('expenses'):Promise.resolve([])]);
+const today=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jakarta'});
+const isToday=o=>new Date(o.paid_at||o.created_at).toLocaleDateString('en-CA',{timeZone:'Asia/Jakarta'})===today;
+const paid=orders.filter(o=>o.payment_status==='paid'&&isToday(o));
+const income=paid.reduce((s,o)=>s+Number(o.total||0),0);const costs=expenses.filter(e=>e.spent_on===today).reduce((s,e)=>s+Number(e.amount),0);
+const metrics=[['Penjualan hari ini',rupiah(income)],['Transaksi lunas',paid.length],['Pesanan hari ini',orders.filter(isToday).length],['Stok menipis',ingredients.filter(x=>Number(x.stock)<=Number(x.minimum)).length]];
+$('content').innerHTML='<div class="grid">'+metrics.map(m=>'<div class="metric"><small>'+m[0]+'</small><b>'+m[1]+'</b></div>').join('')+'</div><div class="notice">Estimasi kas setelah pengeluaran tercatat: <b>'+rupiah(income-costs)+'</b>. Nilai ini bukan laba bersih; biaya bahan dan komponen lain belum seluruhnya dihitung.</div>'+table(['No.','Waktu','Status','Pembayaran','Total'],orders.slice(0,12).map(o=>'<tr><td>#'+esc(o.number)+'</td><td>'+date(o.created_at)+'</td><td><span class="pill">'+esc(o.status)+'</span></td><td>'+esc(o.payment_status)+'</td><td>'+rupiah(o.total)+'</td></tr>'))
+}else if(current==='products'){
+const rows=await list('products');$('content').innerHTML=(role==='owner'?'<div class="panel"><h2>Tambah Produk</h2><form id="addProduct" class="form"><input name="name" placeholder="Nama produk" maxlength="120" required><select name="category"><option>Coffee</option><option>Non-Coffee</option><option>Food</option><option>Snack</option></select><input name="price" type="number" min="0" max="10000000" placeholder="Harga (Rp)" required><button class="primary">Simpan produk</button></form></div>':'')+table(['Nama','Kategori','Harga','Status'],rows.map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.category)+'</td><td>'+rupiah(p.price)+'</td><td>'+esc(p.available&&!p.archived?'Aktif':'Nonaktif')+'</td></tr>'));
+if(role==='owner')$('addProduct').onsubmit=async e=>{e.preventDefault();const f=new FormData(e.target);const {error}=await db.from('products').insert({name:f.get('name'),category:f.get('category'),price:Number(f.get('price'))});if(error)showError(error);else render()}
+}else if(current==='orders'){
+const rows=await list('orders');$('content').innerHTML=table(['No.','Sumber','Pelanggan','Status','Pembayaran','Total','Waktu','Aksi'],rows.map(o=>'<tr><td>#'+esc(o.number)+'</td><td>'+esc(o.source)+'</td><td>'+esc(o.customer_name)+'</td><td>'+esc(o.status)+'</td><td>'+esc(o.payment_status)+'</td><td>'+rupiah(o.total)+'</td><td>'+date(o.created_at)+'</td><td>'+(['new','preparing','ready'].includes(o.status)?'<button class="ghost advance" data-id="'+esc(o.id)+'" data-status="'+({new:'preparing',preparing:'ready',ready:'completed'})[o.status]+'">Lanjutkan</button>':'—')+'</td></tr>'));
+document.querySelectorAll('.advance').forEach(b=>b.onclick=async()=>{b.disabled=true;const {error}=await db.rpc('advance_order',{order_id:b.dataset.id,next_status:b.dataset.status});if(error)showError(error);else render()})
+}else if(current==='inventory'){
+const items=await list('ingredients');$('content').innerHTML=table(['Bahan','Stok','Minimum','Satuan'],items.map(x=>'<tr><td>'+esc(x.name)+'</td><td>'+esc(x.stock)+'</td><td>'+esc(x.minimum)+'</td><td>'+esc(x.unit)+'</td></tr>'))
+}else if(current==='expenses'){
+if(role!=='owner'){$('content').innerHTML='<div class="panel">Hanya Owner yang dapat melihat pengeluaran.</div>'}else{const items=await list('expenses');$('content').innerHTML=table(['Tanggal','Keterangan','Jumlah'],items.map(x=>'<tr><td>'+esc(x.spent_on)+'</td><td>'+esc(x.description)+'</td><td>'+rupiah(x.amount)+'</td></tr>'))}
+}
+$('status').textContent='Data tersinkron dengan Supabase.';
+}catch(e){showError(e)}
+}
+db.auth.onAuthStateChange((event)=>{if(event==='SIGNED_OUT')session()});session();
+</script></body></html>
