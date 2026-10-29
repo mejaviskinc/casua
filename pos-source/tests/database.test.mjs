@@ -71,5 +71,36 @@ await assert.rejects(()=>db.query("insert into purchase_orders(supplier_name,ite
 await as(null);
 await assert.rejects(()=>db.query('select * from purchase_orders'),/permission denied/i);
 console.log('PASS purchasing authorization and cancellation restrictions');
+// Transaction history deletion: owner authorization, audited soft delete, refund accounting, stock restoration.
+const historyPayload={...payload,request_id:'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',tracking_token:'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',items:[{product_id:pid,quantity:1,size:'Regular',topping:''}],discount:0};
+await as(cashier);
+const historyOrder=await scalar('select submit_order($1::jsonb)',[JSON.stringify(historyPayload)]);
+const historyStockBefore=Number(await scalar('select stock from ingredients where id=$1',[iid]));
+await scalar("select pay_order($1,'cash',25000,false)",[historyOrder.id]);
+assert.equal(Number(await scalar('select stock from ingredients where id=$1',[iid])),historyStockBefore-18);
+await assert.rejects(()=>db.query("select delete_order_history($1,'Unauthorized deletion')",[historyOrder.id]),/owner/i);
+await as(null);
+await assert.rejects(()=>db.query("select delete_order_history($1,'Anonymous deletion')",[historyOrder.id]),/permission denied/i);
+assert.notEqual(await scalar('select track_order($1,$2)',[historyOrder.id,historyPayload.tracking_token]),null);
+await as(owner);
+await assert.rejects(()=>db.query("select delete_order_history($1,'X')",[historyOrder.id]),/Alasan/i);
+await assert.rejects(()=>db.query('delete from orders where id=$1',[historyOrder.id]),/permission denied/i);
+await scalar("select delete_order_history($1,'Transaksi salah input')",[historyOrder.id]);
+assert.equal(Number(await scalar('select stock from ingredients where id=$1',[iid])),historyStockBefore);
+assert.equal(Number(await scalar('select count(*)::int from orders where id=$1',[historyOrder.id])),0);
+await scalar("select delete_order_history($1,'Diuji ulang')",[historyOrder.id]);
+assert.equal(Number(await scalar('select stock from ingredients where id=$1',[iid])),historyStockBefore);
+assert.equal(Number(await scalar("select count(*)::int from stock_movements where order_id=$1 and kind='refund'",[historyOrder.id])),1);
+await db.exec('reset role'); // Database owner verifies preserved audit record despite RLS.
+const archived=(await db.query('select deleted_at,deleted_by,deleted_reason,status,payment_status from public.orders where id=$1',[historyOrder.id])).rows[0];
+assert.ok(archived.deleted_at);assert.equal(archived.deleted_by,owner);assert.equal(archived.deleted_reason,'Transaksi salah input');
+assert.equal(archived.status,'cancelled');assert.equal(archived.payment_status,'refunded');
+await as(owner);
+const cancelledStock=Number(await scalar('select stock from ingredients where id=$1',[iid]));
+await scalar("select delete_order_history($1,'Sembunyikan yang dibatalkan')",[order.id]);
+assert.equal(Number(await scalar('select stock from ingredients where id=$1',[iid])),cancelledStock);
+await as(null);
+assert.equal(await scalar('select track_order($1,$2)',[historyOrder.id,historyPayload.tracking_token]),null);
+console.log('PASS history deletion owner-only, stock exactly restored, audit retained, QR inaccessible');
 await as(cashier);await db.query('insert into attendance(staff_id) values($1)',[cashier]);await db.query('select clock_out()');await assert.rejects(()=>db.query('select clock_out()'),/Belum/);console.log('PASS attendance clocks out only once');
 await db.close();console.log('ALL DATABASE CHECKS PASSED (isolated local PostgreSQL; not live Supabase)');
