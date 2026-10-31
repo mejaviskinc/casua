@@ -128,3 +128,8 @@
 .history-delete-box p{font-size:12px;color:#7b4750;line-height:1.6;margin-bottom:14px}
 .history-delete-field{display:flex;flex-direction:column;gap:7px;margin:11px 0;font-weight:600;font-size:12px;color:#71383a}
 .history-delete-field input{width:100%;background:#fff}
+
+/* Printer thermal purchasing: 58/80 mm paper selector */
+.purchase-paper-size{display:flex;align-items:center;gap:7px;padding:0 3px;white-space:nowrap;color:#5d7086;font-size:11px;font-weight:650}
+.purchase-paper-size select{border:1px solid #d8e2ef;border-radius:8px;padding:8px 9px;min-height:38px;background:#fff;color:#1c3656;font:inherit;font-size:12px;cursor:pointer}
+@media(max-width:520px){.purchase-paper-size{width:100%;justify-content:space-between}.purchase-paper-size select{width:auto;min-width:105px}.purchase-toolbar .toolbar-right button{min-width:120px}}
