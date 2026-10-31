@@ -26,7 +26,7 @@ test('ESC/POS thermal data is initialized and includes purchasing details',()=>{
  assert.match(content,/Biji Arabika/);
  assert.match(content,/TOTAL ESTIMASI/);
  assert.match(content,/Rp 125.000/);
- assert.match(content,/bukan bukti pembayaran/);
+ assert.match(content,/bukan bukti\s+pembayaran/);
 });
 
 test('80 mm receipts have longer lines than 58 mm',()=>{
