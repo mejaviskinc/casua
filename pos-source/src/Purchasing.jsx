@@ -5,6 +5,7 @@ import {money} from './domain.mjs';
 import {exportPurchasingPDF,exportPurchasingExcel} from './purchasingExports.js';
 import {printPurchasingThermal} from './purchasingThermal.js';
 import {bluetoothPrinterSupported,connectPurchasingBluetooth,printPurchasingBluetooth} from './purchasingBluetooth.js';
+import {classicBluetoothSupported,connectPurchasingSerial,disconnectPurchasingSerial,printPurchasingSerial} from './purchasingSerial.js';
 
 const statuses={draft:'Draft',ordered:'Dipesan',received:'Diterima',cancelled:'Dibatalkan'};
 const statusTone={draft:'amber',ordered:'blue',received:'green',cancelled:'red'};
@@ -13,6 +14,18 @@ const when=at=>at?new Date(at).toLocaleDateString('id-ID',{day:'2-digit',month:'
 const lowIngredients=ingredients=>ingredients.filter(i=>Number(i.stock)<=Number(i.minimum));
 const targetAmount=i=>Math.max(.001,Math.round(Math.max(Number(i.minimum)-Number(i.stock),Number(i.minimum)||1)*1000)/1000);
 const starterLine=i=>({ingredient_id:i.id,quantity:targetAmount(i),estimated_cost:0});
+async function closePrinterConnection(connection){
+ if(!connection)return;
+ if(connection.kind==='serial'){
+  connection.port.removeEventListener?.('disconnect',connection.onDisconnect);
+  await disconnectPurchasingSerial(connection);
+ }else{
+  connection.device.removeEventListener?.('gattserverdisconnected',connection.onDisconnect);
+  connection.device.gatt?.disconnect();
+ }
+}
+const testPurchase=()=>({number:'TEST',status:'draft',created_at:new Date().toISOString(),supplier_name:'TES MP-5810',total:0,
+ items:[{name:'Tes cetak berhasil',quantity:1,unit:'pcs',estimated_cost:0}],note:'Uji printer Bluetooth CAUSA CAFE'});
 function PurchaseDialog({data,initial,close,run,load,busy}){
  const [supplier,setSupplier]=useState('');
  const [expected,setExpected]=useState('');
@@ -56,34 +69,58 @@ function PurchaseDialog({data,initial,close,run,load,busy}){
 export default function Purchasing({data,requireAuth,run,busy,load,notify}){
  const [dialog,setDialog]=useState(false),[initial,setInitial]=useState([]),[selectedId,setSelectedId]=useState(null),[filter,setFilter]=useState('Semua');
  const printerRef=useRef(null);
- const [blePrinter,setBlePrinter]=useState('');
- const [bleConnected,setBleConnected]=useState(false);
- useEffect(()=>()=>{const current=printerRef.current;if(current?.device){current.device.removeEventListener('gattserverdisconnected',current.onDisconnect);current.device.gatt?.disconnect()}},[]);
+ const [printerName,setPrinterName]=useState('');
+ const [printerMode,setPrinterMode]=useState('');
+ const [paperWidth,setPaperWidth]=useState(()=>{try{return localStorage.getItem('causa-purchasing-paper-width')==='80'?80:58}catch{return 58}});
+ const changePaperWidth=event=>{const width=Number(event.target.value)===80?80:58;setPaperWidth(width);try{localStorage.setItem('causa-purchasing-paper-width',String(width))}catch{}};
+ useEffect(()=>()=>{void closePrinterConnection(printerRef.current).catch(()=>{})},[]);
+ const onPrinterLost=connection=>{
+  if(printerRef.current!==connection)return;
+  printerRef.current=null;setPrinterMode('');setPrinterName('');
+  notify('Koneksi printer terputus. Hubungkan kembali untuk mencetak.',true);
+ };
+ const saveConnection=async connection=>{
+  await closePrinterConnection(printerRef.current).catch(()=>{});
+  connection.onDisconnect=()=>onPrinterLost(connection);
+  if(connection.kind==='serial')connection.port.addEventListener?.('disconnect',connection.onDisconnect);
+  else connection.device.addEventListener('gattserverdisconnected',connection.onDisconnect);
+  printerRef.current=connection;
+  setPrinterMode(connection.kind);
+  setPrinterName(connection.name);
+ };
+ const connectClassic=()=>{
+  if(!requireAuth(true))return;
+  run(async()=>{
+   // requestPort() must start directly from the user click.
+   const connection=await connectPurchasingSerial();
+   await saveConnection(connection);
+   setPaperWidth(58);
+   try{localStorage.setItem('causa-purchasing-paper-width','58')}catch{}
+  },'Port MP-5810 berhasil dihubungkan. Pilih Tes Printer untuk memastikan struk keluar.');
+ };
  const connectBluetooth=()=>{
   if(!requireAuth(true))return;
-  // Invoke the device picker directly from the click, before any intermediate prompts.
   run(async()=>{
-   const connection=await connectPurchasingBluetooth();
-   const previous=printerRef.current;
-   if(previous?.device){previous.device.removeEventListener('gattserverdisconnected',previous.onDisconnect);previous.device.gatt?.disconnect()}
-   connection.onDisconnect=()=>{setBleConnected(false);notify('Koneksi printer Bluetooth terputus. Hubungkan ulang untuk mencetak.',true)};
-   connection.device.addEventListener('gattserverdisconnected',connection.onDisconnect);
-   printerRef.current=connection;
-   setBlePrinter(connection.name);
-   setBleConnected(true);
-  },'Printer Bluetooth BLE terhubung. Siap menerima cetak.');
+   const connection={...await connectPurchasingBluetooth(),kind:'ble'};
+   await saveConnection(connection);
+  },'Printer BLE tersambung. Pilih Tes Printer untuk memastikan struk keluar.');
  };
- const disconnectBluetooth=()=>{
-  const previous=printerRef.current;
-  if(previous?.device){previous.device.removeEventListener('gattserverdisconnected',previous.onDisconnect);previous.device.gatt?.disconnect()}
-  printerRef.current=null;setBleConnected(false);setBlePrinter('');
- };
+ const disconnectBluetooth=()=>run(async()=>{
+  const connection=printerRef.current;
+  printerRef.current=null;
+  setPrinterMode('');setPrinterName('');
+  await closePrinterConnection(connection);
+ },'Printer diputuskan.');
  const bluetoothPrint=records=>{
   if(!requireAuth(true))return;
-  run(async()=>{await printPurchasingBluetooth(printerRef.current,records,paperWidth)},'Data cetak terkirim ke printer Bluetooth. Pastikan struk keluar dengan lengkap.');
+  run(async()=>{
+   const connection=printerRef.current;
+   if(connection?.kind==='serial')await printPurchasingSerial(connection,records,paperWidth);
+   else if(connection?.kind==='ble')await printPurchasingBluetooth(connection,records,paperWidth);
+   else throw Error('Hubungkan printer MP-5810 sebelum mencetak.');
+  },'Data cetak dikirim. Periksa hasil struk di printer.');
  };
- const [paperWidth,setPaperWidth]=useState(()=>{try{return localStorage.getItem('causa-purchasing-paper-width')==='58'?58:80}catch{return 80}});
- const changePaperWidth=event=>{const width=Number(event.target.value)===58?58:80;setPaperWidth(width);try{localStorage.setItem('causa-purchasing-paper-width',String(width))}catch{}};
+ const testPrinter=()=>bluetoothPrint([testPurchase()]);
  const low=lowIngredients(data.ingredients);
  const orders=[...(data.purchase_orders||[])].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
  const view=orders.filter(po=>filter==='Semua'||po.status===filter);
@@ -104,18 +141,18 @@ export default function Purchasing({data,requireAuth,run,busy,load,notify}){
  return <div className="purchasing-workspace">
  <div className="toolbar purchase-toolbar"><div><h2>Purchasing Bahan</h2><p className="muted">Rencanakan belanja dan terima bahan untuk mengisi stok gudang.</p></div><div className="toolbar-right">
  <label className="purchase-paper-size"><span>Kertas thermal</span><select aria-label="Lebar kertas thermal" value={paperWidth} onChange={changePaperWidth}><option value={58}>58 mm</option><option value={80}>80 mm</option></select></label>
- <button className="secondary" type="button" disabled={busy||!bluetoothPrinterSupported()} onClick={connectBluetooth}><Printer size={16}/>{bleConnected?'Ganti Printer Bluetooth':'Hubungkan Bluetooth'}</button>
- {bleConnected&&<button className="secondary" type="button" disabled={busy} onClick={disconnectBluetooth}>Putuskan</button>}
- <button className="primary" type="button" disabled={!view.length||busy||!bleConnected} onClick={()=>bluetoothPrint(view)}><Printer size={16}/>Cetak Bluetooth</button>
+ <button className="secondary" type="button" disabled={busy||!classicBluetoothSupported()} onClick={connectClassic}><Printer size={16}/>Hubungkan MP-5810 (Classic)</button>
+ <button className="secondary" type="button" disabled={busy||!bluetoothPrinterSupported()} onClick={connectBluetooth}><Printer size={16}/>Hubungkan BLE</button>
+ {printerMode&&<><button className="secondary" type="button" disabled={busy} onClick={testPrinter}>Tes Printer</button><button className="secondary" type="button" disabled={busy} onClick={disconnectBluetooth}>Putuskan</button></>}
+ <button className="primary" type="button" disabled={!view.length||busy||!printerMode} onClick={()=>bluetoothPrint(view)}><Printer size={16}/>Cetak Bluetooth</button>
  <button className="secondary" type="button" disabled={!view.length||busy} onClick={()=>thermalPrint(view)}><Printer size={16}/>Cetak via Sistem</button>
  <button className="secondary" disabled={!view.length||busy} onClick={()=>exportFile('pdf',view)}><FileText size={16}/>PDF</button>
  <button className="secondary" disabled={!view.length||busy} onClick={()=>exportFile('excel',view)}><Download size={16}/>Excel</button>
  <button className="secondary" disabled={!view.length||busy} onClick={()=>exportFile('print',view)}><Printer size={16}/>Print A4</button>
  <button className="primary" onClick={()=>open(false)}><Plus size={17}/>Buat pembelian</button></div></div>
  <div className="purchase-bluetooth-info" role="status">
- {bleConnected?<span className="purchase-bluetooth-connected"><CheckCircle2 size={16}/>Tersambung: <strong>{blePrinter}</strong> (Bluetooth BLE)</span>:
- bluetoothPrinterSupported()?<span>Bluetooth BLE: klik <strong>Hubungkan Bluetooth</strong> dan pilih printer yang mendukung ESC/POS. Untuk Bluetooth Classic/SPP, gunakan <strong>Cetak via Sistem</strong> setelah memasang printer di perangkat.</span>:
- <span>Browser ini tidak mendukung cetak Bluetooth BLE langsung. Gunakan Chrome/Edge yang kompatibel atau <strong>Cetak via Sistem</strong> melalui printer Bluetooth yang terpasang di perangkat.</span>}
+ {printerMode?<span className="purchase-bluetooth-connected"><CheckCircle2 size={16}/>Port tersambung: <strong>{printerName}</strong> ({printerMode==='serial'?'Bluetooth Classic/SPP':'Bluetooth BLE'}). Lakukan Tes Printer sebelum mencetak pesanan.</span>:
+ <span><strong>MP-5810 / RPP02N (58 mm):</strong> pasangkan lebih dulu di pengaturan Bluetooth perangkat, lalu pilih <strong>Hubungkan MP-5810 (Classic)</strong>. {classicBluetoothSupported()?'Browser ini mendukung pemilihan port serial.':'Browser ini belum mendukung port serial; gunakan Chrome terbaru yang kompatibel atau Cetak via Sistem melalui layanan printer Bluetooth.'} Jika perangkat hanya menyediakan BLE, gunakan <strong>Hubungkan BLE</strong>. Koneksi dari browser tidak tersedia di semua perangkat.</span>}
  </div>
  <div className="purchase-stats">
  <div className="purchase-stat"><span>Bahan perlu dibeli</span><strong>{low.length}</strong><small>Stok kosong / mencapai batas minimum</small></div>
@@ -140,7 +177,7 @@ export default function Purchasing({data,requireAuth,run,busy,load,notify}){
  <div className="purchase-detail-buttons">
  <button className="secondary" disabled={busy} onClick={()=>exportFile('pdf',[selected])}><FileText size={16}/>PDF</button>
  <button className="secondary" disabled={busy} onClick={()=>exportFile('excel',[selected])}><Download size={16}/>Excel</button>
- <button className="primary" disabled={busy||!bleConnected} onClick={()=>bluetoothPrint([selected])}><Printer size={16}/>Cetak Bluetooth {paperWidth} mm</button>
+ <button className="primary" disabled={busy||!printerMode} onClick={()=>bluetoothPrint([selected])}><Printer size={16}/>Cetak Bluetooth {paperWidth} mm</button>
  <button className="secondary" disabled={busy} onClick={()=>thermalPrint([selected])}><Printer size={16}/>Cetak via Sistem</button>
  <button className="secondary" disabled={busy} onClick={()=>exportFile('print',[selected])}><Printer size={16}/>Print A4</button>
  </div>
