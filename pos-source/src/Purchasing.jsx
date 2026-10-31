@@ -6,6 +6,7 @@ import {exportPurchasingPDF,exportPurchasingExcel} from './purchasingExports.js'
 import {printPurchasingThermal} from './purchasingThermal.js';
 import {bluetoothPrinterSupported,connectPurchasingBluetooth,printPurchasingBluetooth} from './purchasingBluetooth.js';
 import {classicBluetoothSupported,connectPurchasingSerial,disconnectPurchasingSerial,printPurchasingSerial} from './purchasingSerial.js';
+import {connectPurchasingQz,printPurchasingQz} from './purchasingQz.js';
 
 const statuses={draft:'Draft',ordered:'Dipesan',received:'Diterima',cancelled:'Dibatalkan'};
 const statusTone={draft:'amber',ordered:'blue',received:'green',cancelled:'red'};
@@ -71,6 +72,8 @@ export default function Purchasing({data,requireAuth,run,busy,load,notify}){
  const printerRef=useRef(null);
  const [printerName,setPrinterName]=useState('');
  const [printerMode,setPrinterMode]=useState('');
+ const [qzPrinters,setQzPrinters]=useState([]);
+ const [qzPrinter,setQzPrinter]=useState('');
  const [paperWidth,setPaperWidth]=useState(()=>{try{return localStorage.getItem('causa-purchasing-paper-width')==='80'?80:58}catch{return 58}});
  const changePaperWidth=event=>{const width=Number(event.target.value)===80?80:58;setPaperWidth(width);try{localStorage.setItem('causa-purchasing-paper-width',String(width))}catch{}};
  useEffect(()=>()=>{void closePrinterConnection(printerRef.current).catch(()=>{})},[]);
@@ -121,6 +124,18 @@ export default function Purchasing({data,requireAuth,run,busy,load,notify}){
   },'Data cetak dikirim. Periksa hasil struk di printer.');
  };
  const testPrinter=()=>bluetoothPrint([testPurchase()]);
+ const connectQz=()=>{
+  if(!requireAuth(true))return;
+  run(async()=>{
+   const names=await connectPurchasingQz();
+   setQzPrinters(names);
+   setQzPrinter(previous=>names.includes(previous)?previous:(names.find(name=>/YICHiP|MP.?5810|RPP02N/i.test(name))||names[0]));
+  },'QZ Tray terhubung. Pilih printer Mac lalu gunakan Tes QZ.');
+ };
+ const qzPrint=records=>{
+  if(!requireAuth(true))return;
+  run(async()=>{await printPurchasingQz(qzPrinter,records,paperWidth)},'Struk dikirim melalui QZ Tray. Periksa hasil cetaknya.');
+ };
  const low=lowIngredients(data.ingredients);
  const orders=[...(data.purchase_orders||[])].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
  const view=orders.filter(po=>filter==='Semua'||po.status===filter);
@@ -145,6 +160,8 @@ export default function Purchasing({data,requireAuth,run,busy,load,notify}){
  <button className="secondary" type="button" disabled={busy||!bluetoothPrinterSupported()} onClick={connectBluetooth}><Printer size={16}/>Hubungkan BLE</button>
  {printerMode&&<><button className="secondary" type="button" disabled={busy} onClick={testPrinter}>Tes Printer</button><button className="secondary" type="button" disabled={busy} onClick={disconnectBluetooth}>Putuskan</button></>}
  <button className="primary" type="button" disabled={!view.length||busy||!printerMode} onClick={()=>bluetoothPrint(view)}><Printer size={16}/>Cetak Bluetooth</button>
+ <button className="secondary" type="button" disabled={busy} onClick={connectQz}><Printer size={16}/>Hubungkan QZ Tray (Mac)</button>
+ {qzPrinters.length>0&&<><label className="purchase-qz-select"><span>Printer QZ</span><select aria-label="Pilih printer QZ Tray" value={qzPrinter} onChange={event=>setQzPrinter(event.target.value)}>{qzPrinters.map(name=><option key={name} value={name}>{name}</option>)}</select></label><button type="button" className="secondary" disabled={busy||!qzPrinter} onClick={()=>qzPrint([testPurchase()])}>Tes QZ</button><button type="button" className="primary" disabled={!view.length||busy||!qzPrinter} onClick={()=>qzPrint(view)}><Printer size={16}/>Cetak QZ 58 mm</button></>}
  <button className="secondary" type="button" disabled={!view.length||busy} onClick={()=>thermalPrint(view)}><Printer size={16}/>Cetak via Sistem</button>
  <button className="secondary" disabled={!view.length||busy} onClick={()=>exportFile('pdf',view)}><FileText size={16}/>PDF</button>
  <button className="secondary" disabled={!view.length||busy} onClick={()=>exportFile('excel',view)}><Download size={16}/>Excel</button>
@@ -154,6 +171,7 @@ export default function Purchasing({data,requireAuth,run,busy,load,notify}){
  {printerMode?<span className="purchase-bluetooth-connected"><CheckCircle2 size={16}/>Port tersambung: <strong>{printerName}</strong> ({printerMode==='serial'?'Bluetooth Classic/SPP':'Bluetooth BLE'}). Lakukan Tes Printer sebelum mencetak pesanan.</span>:
  <span><strong>MP-5810 / RPP02N (58 mm):</strong> pasangkan lebih dulu di pengaturan Bluetooth perangkat, lalu pilih <strong>Hubungkan MP-5810 (Classic)</strong>. {classicBluetoothSupported()?'Browser ini mendukung pemilihan port serial.':'Browser ini belum mendukung port serial; gunakan Chrome terbaru yang kompatibel atau Cetak via Sistem melalui layanan printer Bluetooth.'} Jika perangkat hanya menyediakan BLE, gunakan <strong>Hubungkan BLE</strong>. Koneksi dari browser tidak tersedia di semua perangkat.</span>}
  </div>
+ <p className="purchase-helper-text">MacBook dengan driver YICHiP: bila paper size hanya A4, gunakan <strong>QZ Tray</strong> untuk raw ESC/POS tanpa dialog ukuran kertas. <a href="https://qz.io/download/?os=apple" target="_blank" rel="noopener noreferrer">Unduh QZ Tray resmi untuk macOS</a>. QZ Tray adalah aplikasi pendamping, bukan ekstensi Chrome; konfirmasi izin cetak dapat muncul pada versi tanpa sertifikat penandatanganan.</p>
  <div className="purchase-stats">
  <div className="purchase-stat"><span>Bahan perlu dibeli</span><strong>{low.length}</strong><small>Stok kosong / mencapai batas minimum</small></div>
  <div className="purchase-stat"><span>Menunggu barang</span><strong>{orders.filter(x=>x.status==='ordered').length}</strong><small>Purchase order belum diterima</small></div>
@@ -178,6 +196,7 @@ export default function Purchasing({data,requireAuth,run,busy,load,notify}){
  <button className="secondary" disabled={busy} onClick={()=>exportFile('pdf',[selected])}><FileText size={16}/>PDF</button>
  <button className="secondary" disabled={busy} onClick={()=>exportFile('excel',[selected])}><Download size={16}/>Excel</button>
  <button className="primary" disabled={busy||!printerMode} onClick={()=>bluetoothPrint([selected])}><Printer size={16}/>Cetak Bluetooth {paperWidth} mm</button>
+ {qzPrinters.length>0&&<button className="primary" disabled={busy||!qzPrinter} onClick={()=>qzPrint([selected])}><Printer size={16}/>Cetak QZ {paperWidth} mm</button>}
  <button className="secondary" disabled={busy} onClick={()=>thermalPrint([selected])}><Printer size={16}/>Cetak via Sistem</button>
  <button className="secondary" disabled={busy} onClick={()=>exportFile('print',[selected])}><Printer size={16}/>Print A4</button>
  </div>
