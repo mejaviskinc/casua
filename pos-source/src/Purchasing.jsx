@@ -3,6 +3,7 @@ import {Plus,Check,Trash2,Package,ShoppingCart,FileText,Download,Printer,Clock,C
 import {rpc} from './api.js';
 import {money} from './domain.mjs';
 import {exportPurchasingPDF,exportPurchasingExcel} from './purchasingExports.js';
+import {printPurchasingThermal} from './purchasingThermal.js';
 
 const statuses={draft:'Draft',ordered:'Dipesan',received:'Diterima',cancelled:'Dibatalkan'};
 const statusTone={draft:'amber',ordered:'blue',received:'green',cancelled:'red'};
@@ -53,6 +54,8 @@ function PurchaseDialog({data,initial,close,run,load,busy}){
 }
 export default function Purchasing({data,requireAuth,run,busy,load,notify}){
  const [dialog,setDialog]=useState(false),[initial,setInitial]=useState([]),[selectedId,setSelectedId]=useState(null),[filter,setFilter]=useState('Semua');
+ const [paperWidth,setPaperWidth]=useState(()=>{try{return localStorage.getItem('causa-purchasing-paper-width')==='58'?58:80}catch{return 80}});
+ const changePaperWidth=event=>{const width=Number(event.target.value)===58?58:80;setPaperWidth(width);try{localStorage.setItem('causa-purchasing-paper-width',String(width))}catch{}};
  const low=lowIngredients(data.ingredients);
  const orders=[...(data.purchase_orders||[])].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
  const view=orders.filter(po=>filter==='Semua'||po.status===filter);
@@ -68,12 +71,15 @@ export default function Purchasing({data,requireAuth,run,busy,load,notify}){
   if(mode==='pdf')await exportPurchasingPDF(records);
   if(mode==='excel')await exportPurchasingExcel(records);
   if(mode==='print')await exportPurchasingPDF(records,true);
- },mode==='print'?'Dokumen disiapkan untuk dicetak.':'Dokumen berhasil disiapkan.');
+ },mode==='print'?'Dokumen A4 disiapkan untuk dicetak.':'Dokumen berhasil disiapkan.');
+ const thermalPrint=records=>run(async()=>{printPurchasingThermal(records,paperWidth)},'Jendela cetak thermal siap. Pilih printer dan lebar kertas yang sesuai.');
  return <div className="purchasing-workspace">
  <div className="toolbar purchase-toolbar"><div><h2>Purchasing Bahan</h2><p className="muted">Rencanakan belanja dan terima bahan untuk mengisi stok gudang.</p></div><div className="toolbar-right">
- <button className="secondary" disabled={!orders.length||busy} onClick={()=>exportFile('pdf',view)}><FileText size={16}/>PDF</button>
- <button className="secondary" disabled={!orders.length||busy} onClick={()=>exportFile('excel',view)}><Download size={16}/>Excel</button>
- <button className="secondary" disabled={!orders.length||busy} onClick={()=>exportFile('print',view)}><Printer size={16}/>Print</button>
+ <label className="purchase-paper-size"><span>Kertas thermal</span><select aria-label="Lebar kertas thermal" value={paperWidth} onChange={changePaperWidth}><option value={58}>58 mm</option><option value={80}>80 mm</option></select></label>
+ <button className="secondary" disabled={!view.length||busy} onClick={()=>thermalPrint(view)}><Printer size={16}/>Print Thermal</button>
+ <button className="secondary" disabled={!view.length||busy} onClick={()=>exportFile('pdf',view)}><FileText size={16}/>PDF</button>
+ <button className="secondary" disabled={!view.length||busy} onClick={()=>exportFile('excel',view)}><Download size={16}/>Excel</button>
+ <button className="secondary" disabled={!view.length||busy} onClick={()=>exportFile('print',view)}><Printer size={16}/>Print A4</button>
  <button className="primary" onClick={()=>open(false)}><Plus size={17}/>Buat pembelian</button></div></div>
  <div className="purchase-stats">
  <div className="purchase-stat"><span>Bahan perlu dibeli</span><strong>{low.length}</strong><small>Stok kosong / mencapai batas minimum</small></div>
@@ -98,7 +104,8 @@ export default function Purchasing({data,requireAuth,run,busy,load,notify}){
  <div className="purchase-detail-buttons">
  <button className="secondary" disabled={busy} onClick={()=>exportFile('pdf',[selected])}><FileText size={16}/>PDF</button>
  <button className="secondary" disabled={busy} onClick={()=>exportFile('excel',[selected])}><Download size={16}/>Excel</button>
- <button className="secondary" disabled={busy} onClick={()=>exportFile('print',[selected])}><Printer size={16}/>Print</button>
+ <button className="secondary" disabled={busy} onClick={()=>thermalPrint([selected])}><Printer size={16}/>Print Thermal {paperWidth} mm</button>
+ <button className="secondary" disabled={busy} onClick={()=>exportFile('print',[selected])}><Printer size={16}/>Print A4</button>
  </div>
  {selected.status==='draft'&&<div className="purchase-detail-buttons"><button className="primary" disabled={busy} onClick={()=>progress(selected,'order')}><Truck size={16}/>Tandai dipesan</button><button className="secondary" disabled={busy} onClick={()=>progress(selected,'cancel')}>Batalkan draft</button></div>}
  {selected.status==='ordered'&&<div className="purchase-detail-buttons"><button className="primary" disabled={busy} onClick={()=>progress(selected,'receive')}><Package size={16}/>Terima barang & tambah stok</button><button className="secondary" disabled={busy} onClick={()=>progress(selected,'cancel')}>Batalkan pesanan</button></div>}
