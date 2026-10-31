@@ -1,5 +1,5 @@
-// Web Bluetooth can reach BLE/GATT printers only. Classic Bluetooth SPP is
-// supported via the operating-system print dialog, not from a web page.
+// Web Bluetooth can reach BLE/GATT printers only. Bluetooth Classic SPP
+// uses Web Serial when the browser exposes paired RFCOMM ports (purchasingSerial.js).
 const BASE = '-0000-1000-8000-00805f9b34fb';
 const uuid16 = hex => '0000' + hex + BASE;
 const ISSC_SERVICE = '49535343-fe7d-4ae5-8fa9-9fafd205e455';
@@ -94,7 +94,7 @@ export function buildPurchasingEscPos(orders,paperWidth=80){
  return Uint8Array.from(chunks);
 }
 export async function connectPurchasingBluetooth(){
- if(!bluetoothPrinterSupported())throw Error('Browser ini tidak mendukung Bluetooth langsung. Gunakan Chrome/Edge pada perangkat yang kompatibel, atau Cetak via Sistem untuk printer Bluetooth Classic.');
+ if(!bluetoothPrinterSupported())throw Error('Browser ini tidak mendukung Bluetooth langsung. Gunakan Chrome/Edge yang kompatibel atau koneksi Bluetooth Classic melalui Web Serial.');
  // The device chooser must be called from a direct user click.
  const device=await navigator.bluetooth.requestDevice({
   acceptAllDevices:true,optionalServices:BLE_PRINT_PROFILES.map(p=>p.service)
@@ -111,7 +111,7 @@ export async function connectPurchasingBluetooth(){
    const characteristic=preferred.find(c=>profile.writes.includes(c.uuid.toLowerCase()) && (c.properties.writeWithoutResponse||c.properties.write));
    if(characteristic)return {device,characteristic,name:device.name||'Printer Bluetooth'};
   }
-  throw Error('Printer ditemukan, tetapi layanan ESC/POS BLE tidak cocok. Bila printer memakai Bluetooth Classic, gunakan Cetak via Sistem. Untuk printer BLE lain, diperlukan UUID/protokol sesuai model.');
+  throw Error('Printer ditemukan, tetapi layanan ESC/POS BLE tidak cocok. Bila printer memakai Bluetooth Classic, gunakan Hubungkan MP-5810 (Classic) jika browser mendukung Web Serial. Untuk printer BLE lain, diperlukan UUID/protokol sesuai model.');
  }catch(error){
   if(server?.connected)server.disconnect();
   throw error;
