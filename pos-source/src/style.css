@@ -139,3 +139,10 @@
 .purchase-bluetooth-connected{display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:#14714a}
 .purchase-toolbar .toolbar-right .primary:disabled{opacity:.55}
 @media(max-width:520px){.purchase-bluetooth-info{font-size:11px}.purchase-toolbar .toolbar-right{align-items:stretch}.purchase-toolbar .toolbar-right button{justify-content:center}}
+
+/* Optional QZ Tray native Mac print bridge */
+.purchase-qz-select{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:#36516a;font-weight:600}
+.purchase-qz-select select{max-width:260px;min-height:37px;border:1px solid #d8e2ef;border-radius:7px;padding:7px 8px;background:#fff;color:#18385e}
+.purchase-helper-text{margin:0;padding:12px 14px;background:#f3f7fd;border:1px solid #dde7f4;border-radius:10px;font-size:11px;color:#4d6380;line-height:1.65}
+.purchase-helper-text a{color:#084da8;text-decoration:underline;font-weight:700}
+@media(max-width:520px){.purchase-qz-select{width:100%;justify-content:space-between}.purchase-qz-select select{width:100%;max-width:100%}}
