@@ -11,6 +11,7 @@ export function buildPurchasingThermalHTML(orders, paperWidth = 80) {
  const data = (Array.isArray(orders) ? orders : [orders]).filter(Boolean);
  if (!data.length) throw new Error('Belum ada daftar pembelian yang bisa dicetak.');
  const width = Number(paperWidth) === 58 ? 58 : 80;
+ const horizontalPadding = width === 58 ? 5 : 4;
  const receipts = data.map(po => {
   const items = Array.isArray(po.items) ? po.items : [];
   const rows = items.map(item => '<div class="item">' +
@@ -44,7 +45,7 @@ export function buildPurchasingThermalHTML(orders, paperWidth = 80) {
   '.actions{max-width:420px;margin:14px auto;text-align:center;font:14px Arial,sans-serif;color:#29384d}' +
   '.actions button{padding:10px 22px;border:0;border-radius:8px;background:#084da8;color:white;font-weight:700;cursor:pointer}' +
   '.actions p{font-size:12px;line-height:1.5;margin:8px 12px}' +
-  '.paper{width:' + width + 'mm;padding:3mm 3mm 5mm;margin:auto;background:#fff;font-size:' + (width === 58 ? '10' : '11') + 'px;line-height:1.35;overflow-wrap:anywhere}' +
+  '.paper{width:' + width + 'mm;padding:3mm ' + horizontalPadding + 'mm 5mm;margin:auto;background:#fff;font-size:' + (width === 58 ? '10' : '11') + 'px;line-height:1.35;overflow-wrap:anywhere}' +
   '.receipt+.receipt{border-top:2px dashed #222;margin-top:5mm;padding-top:5mm}' +
   '.brand{font-size:' + (width === 58 ? '15' : '18') + 'px;font-weight:800;letter-spacing:.7px;text-align:center}' +
   '.subtitle{text-align:center;font-weight:700;font-size:10px;margin:3px 0 7px}' +
@@ -58,7 +59,7 @@ export function buildPurchasingThermalHTML(orders, paperWidth = 80) {
   '.footer{text-align:center;font-size:9px;margin-top:10px}.footer div{margin-top:4px}' +
   '@media screen{.paper{box-shadow:0 4px 20px #0002;margin-bottom:30px}}' +
   '@media print{html,body{background:#fff!important;width:' + width + 'mm!important;margin:0!important;padding:0!important}' +
-  '.actions{display:none!important}.paper{width:' + width + 'mm!important;margin:0!important;padding:3mm 3mm 5mm!important;box-shadow:none!important}' +
+  '.actions{display:none!important}.paper{width:' + width + 'mm!important;margin:0!important;padding:3mm ' + horizontalPadding + 'mm 5mm!important;box-shadow:none!important}' +
   '.receipt{break-inside:avoid-page}}' +
   '</style></head><body><div class="actions"><button type="button" onclick="window.print()">Cetak nota thermal</button>' +
   '<p>Gunakan printer thermal ' + width + ' mm, skala 100%, margin tanpa tepi dan nonaktifkan header/footer pada dialog print.</p></div>' +
