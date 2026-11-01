@@ -1,5 +1,5 @@
 import {test} from 'node:test';import assert from 'node:assert/strict';
-import {totals,operationalSummary,dayKey,orderPayload,menuDiscount,menuPrice,menuUnitPrice} from '../src/domain.mjs';
+import {totals,operationalSummary,dayKey,orderPayload,menuDiscount,menuPrice,menuUnitPrice,menuGrossProfit} from '../src/domain.mjs';
 test('Jakarta date boundary uses paid date',()=>{assert.equal(dayKey('2026-10-27T18:10:00Z'),'2026-10-28')});
 test('cancelled and unpaid orders never become revenue',()=>{const base={total:50000,created_at:'2026-10-27T16:00:00Z',paid_at:'2026-10-27T18:10:00Z'};const orders=[{...base,payment_status:'paid',status:'completed'},{...base,payment_status:'refunded',status:'cancelled'},{...base,payment_status:'paid',status:'cancelled'},{...base,payment_status:'unpaid',status:'pending'}];const s=operationalSummary(orders,[{spent_on:'2026-10-28',amount:10000},{spent_on:'2026-10-27',amount:5000}],'2026-10-28');assert.equal(s.revenue,50000);assert.equal(s.profit,40000);assert.equal(s.transactions,1)});
 test('discount bounded to subtotal and quantities included',()=>{assert.deepEqual(totals([{unit_price:20000,quantity:3}],5000),{subtotal:60000,discount:5000,total:55000});assert.equal(totals([{unit_price:100,quantity:1}],1000).total,0)});
@@ -15,3 +15,5 @@ test('menu discount can be percentage, fixed rupiah and disabled, with modifiers
  assert.equal(menuDiscount({price:100,discount_type:'percent',discount_value:150}),100);
  assert.equal(menuDiscount({price:100,discount_type:'amount',discount_value:10000}),100);
 });
+
+test('menu gross profit respects product discount and cost per base portion',()=>{assert.equal(menuGrossProfit({price:20000,discount_type:'amount',discount_value:2000},8500),9500);assert.equal(menuGrossProfit({price:15000,discount_type:'percent',discount_value:20},13500),-1500);assert.equal(menuGrossProfit({price:0,discount_type:'none'},0),0)});
