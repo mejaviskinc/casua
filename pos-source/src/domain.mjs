@@ -13,6 +13,8 @@ export function menuDiscount(product){
  return 0;
 }
 export function menuPrice(product){return Math.max(0,Math.trunc(Number(product?.price)||0))-menuDiscount(product);}
+// Gross profit estimate for the base menu item; excludes add-ons, overhead and order-level discounts.
+export function menuGrossProfit(product,costPrice){return menuPrice(product)-Math.max(0,Math.trunc(Number(costPrice)||0));}
 export function menuUnitPrice(product,size='',topping=''){return menuPrice(product)+Number(product.sizes?.find(s=>s.name===size)?.extra||0)+Number(product.toppings?.find(t=>t.name===topping)?.extra||0);}
 export function menuDiscountLabel(product){return product?.discount_type==='percent'?('Diskon '+Number(product.discount_value||0)+'%'):'Diskon '+money(menuDiscount(product));}
 export function totals(items,discount=0){const subtotal=items.reduce((s,i)=>s+(Number(i.unit_price)||0)*i.quantity,0); const cut=Math.min(subtotal,Math.max(0,Number(discount)||0));return {subtotal,discount:cut,total:subtotal-cut};}
