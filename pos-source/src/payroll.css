@@ -1,0 +1,23 @@
+.payroll-page{display:flex;flex-direction:column;gap:18px}
+.payroll-period{display:flex;align-items:center;gap:10px;color:#52637d;font-weight:650}
+.payroll-period input{border:1px solid var(--border);background:white;border-radius:9px;padding:10px 12px;color:#18314e;min-height:40px}
+.payroll-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px}
+.payroll-summary .stat-card{display:flex;flex-direction:column;gap:8px;padding:20px}
+.payroll-summary .stat-card>span{color:#68788b;font-weight:650}
+.payroll-summary .stat-card>strong{font-size:23px;letter-spacing:-.6px;color:#084da8}
+.payroll-summary .stat-card>small{font-size:11px;color:#7a8598}
+.payroll-explainer{padding:14px 18px;background:#eef5ff;border:1px solid #dbeafe;color:#365879;border-radius:10px;line-height:1.7}
+.payroll-page .panel{padding:20px}
+.payroll-page td small{display:block;color:#8390a3;margin-top:4px}
+.payroll-page .table-scroll{width:100%;overflow-x:auto}
+.payroll-page table{min-width:720px}
+.payroll-create-row{display:flex;flex-wrap:wrap;align-items:center;gap:9px;padding:13px 0}
+.payroll-create-row>span{font-weight:650;color:#52637d}
+.payroll-empty{padding:35px 14px;text-align:center;color:#7c8899;line-height:1.7}
+.payroll-actions{flex-wrap:nowrap;white-space:nowrap}
+.payroll-modal form{display:flex;flex-direction:column;gap:15px;padding-top:7px}
+.payroll-modal .two-col{gap:12px}
+.payroll-confirm-total{display:flex;align-items:center;justify-content:space-between;padding:17px;background:#f1f6fe;border-radius:10px}
+.payroll-confirm-total strong{font-size:21px;color:#084da8}
+@media(max-width:900px){.payroll-summary{grid-template-columns:1fr}.payroll-period{flex-wrap:wrap}.payroll-page .panel{padding:14px}.payroll-page .toolbar{gap:12px;flex-wrap:wrap}}
+@media(max-width:520px){.payroll-modal .two-col{grid-template-columns:1fr}.payroll-summary .stat-card>strong{font-size:21px}}
