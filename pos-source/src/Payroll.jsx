@@ -3,17 +3,16 @@ import {Plus,Wallet,Download,FileText,Check,Trash2,Pencil,X,CalendarDays} from '
 import {db,rpc} from './api.js';
 import {money,todayKey} from './domain.mjs';
 import {exportPayrollExcel,exportPayslipPDF} from './payrollExports.js';
+import {validPayrollAmounts} from './payrollMath.mjs';
 import './payroll.css';
 
 const thisMonth=()=>todayKey().slice(0,7);
-const positiveNumber=value=>Number.isSafeInteger(Number(value))&&Number(value)>=0&&Number(value)<=1_000_000_000;
 function Popup({title,close,children}){
  return <div className="modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)close()}}><section className="modal payroll-modal" role="dialog" aria-modal="true" aria-label={title}><header><h2>{title}</h2><button type="button" className="icon-btn" onClick={close} aria-label="Tutup"><X size={18}/></button></header>{children}</section></div>;
 }
 function NumberField({label,name,value=0}){
  return <label className="field"><span>{label}</span><input type="number" name={name} defaultValue={value} min="0" max="1000000000" step="1" required inputMode="numeric"/></label>;
 }
-function payrollTotal(p){return Number(p.base_salary||0)+Number(p.allowance||0)+Number(p.bonus||0)-Number(p.deduction||0)}
 export default function Payroll({data,role,connected,user,run,load,requireAuth,busy}){
  const [period,setPeriod]=useState(thisMonth());
  const [setting,setSetting]=useState(null);
@@ -34,7 +33,7 @@ export default function Payroll({data,role,connected,user,run,load,requireAuth,b
  const saveSetting=async e=>{
   e.preventDefault();if(!requireAuth(true))return;
   const f=new FormData(e.currentTarget),amount=Number(f.get('salary'));
-  if(!positiveNumber(amount))return;
+  if(!Number.isSafeInteger(amount)||amount<0||amount>1_000_000_000)return;
   const result=await run(async()=>{
    const {error}=await db.from('payroll_settings').upsert({staff_id:setting.id,base_salary:amount,updated_at:new Date().toISOString()},{onConflict:'staff_id'});
    if(error)throw error;await load();setSetting(null);
@@ -45,7 +44,7 @@ export default function Payroll({data,role,connected,user,run,load,requireAuth,b
   e.preventDefault();if(!requireAuth(true))return;
   const f=new FormData(e.currentTarget);
   const amounts=Object.fromEntries(['base_salary','allowance','bonus','deduction'].map(k=>[k,Number(f.get(k))]));
-  if(!Object.values(amounts).every(positiveNumber)||amounts.deduction>amounts.base_salary+amounts.allowance+amounts.bonus)return;
+  if(!validPayrollAmounts(amounts))return;
   const payload={...amounts,note:String(f.get('note')||'').trim().slice(0,500)};
   await run(async()=>{
    const result=editor.id
